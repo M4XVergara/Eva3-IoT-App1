@@ -1,8 +1,6 @@
 package com.example.eva3.data.remote
 
-import com.example.eva3.data.remote.dto.BarrierRequest
-import com.example.eva3.data.remote.dto.BarrierStateDto
-import com.example.eva3.data.remote.dto.SensorDto
+import com.example.eva3.data.remote.dto.*
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -10,25 +8,29 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface IotApi {
-    // --- GESTIÓN DE SENSORES ---
-    // Obtener lista de sensores registrados [cite: 206, 270]
-    @GET("api/sensores")
+
+    // --- AUTENTICACIÓN (Esto faltaba y causaba el error "Unresolved reference: login") ---
+    @POST("login")
+    suspend fun login(@Body request: LoginRequestDto): LoginResponseDto
+
+    // --- SENSORES ---
+    @GET("sensores")
     suspend fun getSensores(): List<SensorDto>
 
-    // Agregar un nuevo sensor (Requisito Admin) [cite: 192]
-    @POST("api/sensores")
+    @POST("sensores")
     suspend fun addSensor(@Body sensor: SensorDto): SensorDto
 
-    // Cambiar estado de sensor (Activar/Desactivar/Bloquear) [cite: 205-206]
-    @PUT("api/sensores/{id}")
+    @PUT("sensores/{id}")
     suspend fun updateSensorState(@Path("id") id: Int, @Body sensor: SensorDto): SensorDto
 
-    // --- CONTROL DE BARRERA ---
-    // Enviar orden de abrir/cerrar [cite: 211]
-    @POST("api/barrera/control")
+    // --- BARRERA ---
+    @POST("control-barrera")
     suspend fun controlBarrier(@Body request: BarrierRequest): BarrierStateDto
 
-    // Consultar si está abierta o cerrada [cite: 212]
-    @GET("api/barrera/estado")
+    @GET("estado-barrera")
     suspend fun getBarrierState(): BarrierStateDto
+
+    // --- HISTORIAL (Esto faltaba y causaba error "Unresolved reference: getHistorial") ---
+    @GET("eventos")
+    suspend fun getHistorial(): List<EventoDto>
 }

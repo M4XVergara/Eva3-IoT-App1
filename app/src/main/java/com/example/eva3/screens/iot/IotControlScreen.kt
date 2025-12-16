@@ -1,151 +1,169 @@
 package com.example.eva3.screens.iot
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+// Importamos cada ícono explícitamente para evitar errores
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.CheckCircle // Usamos este en vez de LockOpen
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.* // --- ¡ESTOS DOS IMPORTS SON VITALES PARA EL 'BY REMEMBER'! ---
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+// -------------------------------------------------------------
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel // Si esto sale en rojo, avísame (falta una librería pequeña)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IotControlScreen(
-    viewModel: IotViewModel = viewModel() // Conectamos la pantalla con el ViewModel
-) {
-    // 1. Observamos el estado. Cada vez que el ViewModel cambie algo, 'uiState' se actualizará aquí.
-    val uiState by viewModel.uiState.collectAsState()
+fun IotControlScreen(viewModel: IotViewModel) {
+    // CORRECCIÓN 1: Usamos 'mutableIntStateOf' (nombre correcto)
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val titulos = listOf("Control", "Sensores", "Historial")
 
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Control de Acceso IoT") })
-        }
-    ) { paddingValues ->
-
-        // Contenedor principal
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .padding(16.dp)
-                .fillMaxSize()
-        ) {
-
-            // 2. Si hay error, lo mostramos
-            if (uiState.error != null) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
-                ) {
-                    Text(
-                        text = "Error: ${uiState.error}",
-                        color = Color.Red,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-            }
-
-            // 3. Indicador de carga
-            if (uiState.isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // --- TARJETA DE CONTROL DE BARRERA ---
-            Card(
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Control de Barrera", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Indicador visual del estado
-                    Text(
-                        text = if (uiState.isBarrierOpen) "ABIERTA" else "CERRADA",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (uiState.isBarrierOpen) Color(0xFF4CAF50) else Color(0xFFF44336)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Botones de acción
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Button(
-                            onClick = { viewModel.toggleBarrier(true) }, // Abrir
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
-                        ) {
-                            Text("ABRIR")
-                        }
-
-                        Button(
-                            onClick = { viewModel.toggleBarrier(false) }, // Cerrar
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
-                        ) {
-                            Text("CERRAR")
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // --- LISTA DE SENSORES ---
-            Text("Sensores Registrados", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn {
-                items(uiState.sensorList) { sensor ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(text = "ID: ${sensor.codigo_sensor}", fontWeight = FontWeight.Bold)
-                                Text(text = "Tipo: ${sensor.tipo}", style = MaterialTheme.typography.bodySmall)
+        bottomBar = {
+            NavigationBar {
+                titulos.forEachIndexed { index, titulo ->
+                    NavigationBarItem(
+                        icon = {
+                            when (index) {
+                                0 -> Icon(Icons.Default.Home, null)
+                                1 -> Icon(Icons.Default.Settings, null)
+                                else -> Icon(Icons.Default.List, null)
                             }
+                        },
+                        label = { Text(titulo) },
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
+            Text(
+                text = "Panel: ${viewModel.usuarioLogueado?.nombre ?: "Usuario"}",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
-                            // Estado del sensor
-                            AssistChip(
-                                onClick = {
-                                    // Al hacer clic, cambiamos el estado (Lógica simple: si es ACTIVO pasa a INACTIVO)
-                                    val nuevoEstado = sensor.estado != "ACTIVO"
-                                    viewModel.toggleSensorState(sensor, nuevoEstado)
-                                },
-                                label = { Text(sensor.estado) },
-                                leadingIcon = {
-                                    if (sensor.estado == "ACTIVO")
-                                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Green)
-                                }
-                            )
+            when (selectedTab) {
+                0 -> SectionControlBarrera(viewModel)
+                1 -> SectionGestionSensores(viewModel)
+                2 -> SectionHistorial(viewModel)
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionControlBarrera(viewModel: IotViewModel) {
+    val estadoTexto = if (viewModel.isBarrierOpen) "ABIERTA" else "CERRADA"
+    val colorEstado = if (viewModel.isBarrierOpen) Color.Green else Color.Red
+
+    // CORRECCIÓN 2: Cambiamos LockOpen por CheckCircle para asegurar que compile sin librerías extra
+    val iconoEstado = if (viewModel.isBarrierOpen) Icons.Default.CheckCircle else Icons.Default.Lock
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = iconoEstado,
+            contentDescription = null,
+            modifier = Modifier.size(100.dp),
+            tint = colorEstado
+        )
+        Text(text = "Estado: $estadoTexto", style = MaterialTheme.typography.headlineMedium)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = { viewModel.toggleBarrier() },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (viewModel.isBarrierOpen) Color.Red else Color(0xFF006400)
+            )
+        ) {
+            Text(if (viewModel.isBarrierOpen) "CERRAR BARRERA" else "ABRIR BARRERA")
+        }
+    }
+}
+
+@Composable
+fun SectionGestionSensores(viewModel: IotViewModel) {
+    var nuevoCodigo by remember { mutableStateOf("") }
+
+    Column {
+        Text("Agregar Nuevo Sensor:")
+        Row {
+            OutlinedTextField(
+                value = nuevoCodigo,
+                onValueChange = { nuevoCodigo = it },
+                modifier = Modifier.weight(1f),
+                label = { Text("Código RFID") }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = {
+                viewModel.agregarSensor(nuevoCodigo, "Tarjeta")
+                nuevoCodigo = ""
+            }) {
+                Icon(Icons.Default.Add, null)
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Lista de Sensores:")
+        LazyColumn {
+            items(viewModel.sensores) { sensor ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (sensor.estado == "ACTIVO") Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "ID: ${sensor.codigo_sensor}", style = MaterialTheme.typography.bodyLarge)
+                            Text(text = "Estado: ${sensor.estado}", style = MaterialTheme.typography.bodySmall)
                         }
+                        Switch(
+                            checked = sensor.estado == "ACTIVO",
+                            onCheckedChange = { viewModel.cambiarEstadoSensor(sensor) }
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SectionHistorial(viewModel: IotViewModel) {
+    // Recargamos historial cada vez que entramos a esta pestaña
+    LaunchedEffect(Unit) { viewModel.refrescarHistorial() }
+
+    LazyColumn {
+        items(viewModel.historial) { evento ->
+            ListItem(
+                headlineContent = { Text(evento.tipo) },
+                supportingContent = { Text(evento.detalle) },
+                leadingContent = { Icon(Icons.Default.Info, null) },
+                trailingContent = { Text(evento.fecha.take(10), style = MaterialTheme.typography.labelSmall) }
+            )
+            HorizontalDivider()
         }
     }
 }

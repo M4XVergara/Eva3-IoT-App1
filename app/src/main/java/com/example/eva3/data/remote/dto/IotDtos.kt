@@ -1,21 +1,46 @@
 package com.example.eva3.data.remote.dto
 
-// DTO para representar un Sensor (Tarjeta o Llavero)
-// Basado en la estructura de datos sugerida en la Sumativa (pag 5)
-data class SensorDto(
+// 1. DTOs para Login (Esto es lo que le faltaba a tu código)
+data class LoginRequestDto(
+    val email: String,
+    val password: String
+)
+
+data class LoginResponseDto(
+    val status: String,      // "ok" o "error"
+    val usuario: UsuarioDto? // null si falla
+)
+
+data class UsuarioDto(
     val id: Int,
-    val codigo_sensor: String, // UID o MAC de la tarjeta [cite: 271]
-    val estado: String,        // "ACTIVO", "INACTIVO", "BLOQUEADO" [cite: 272]
-    val tipo: String           // "Tarjeta" o "Llavero" [cite: 274]
+    val nombre: String,
+    val email: String,
+    val rol: String
 )
 
-// DTO para enviar comandos a la barrera (Abrir/Cerrar)
-// Requisito: Control manual desde la App [cite: 208-209]
+// 2. Sensor
+data class SensorDto(
+    val id: Int = 0,
+    val codigo_sensor: String,
+    val estado: String,
+    val tipo: String
+)
+
+// 3. Barrera
+// ¡AQUÍ ESTÁ LA SOLUCIÓN DEL ERROR DE LÍNEA 65!
+// Antes tenías "action", ahora debe ser "accion" para que coincida con el Repositorio
 data class BarrierRequest(
-    val action: String // Enviamos "ABRIR" o "CERRAR"
+    val accion: String
 )
 
-// DTO para recibir el estado actual de la barrera desde la API
 data class BarrierStateDto(
-    val isOpen: Boolean // true = Abierta, false = Cerrada
+    val isOpen: Boolean
+)
+
+// 4. Historial (Soluciona el error de getHistorial)
+data class EventoDto(
+    val id: Int,
+    val fecha: String,
+    val tipo: String,
+    val detalle: String
 )

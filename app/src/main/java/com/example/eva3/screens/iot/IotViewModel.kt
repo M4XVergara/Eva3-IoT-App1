@@ -1,90 +1,124 @@
 package com.example.eva3.screens.iot
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.eva3.data.remote.HttpClient
 import com.example.eva3.data.remote.IotRepository
+import com.example.eva3.data.remote.dto.EventoDto
 import com.example.eva3.data.remote.dto.SensorDto
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.example.eva3.data.remote.dto.UsuarioDto
 import kotlinx.coroutines.launch
 
-class IotViewModel : ViewModel() {
+class IotViewModel(private val repository: IotRepository) : ViewModel() {
 
-    // Conectamos con el repositorio que creaste antes
-    private val repository = IotRepository(HttpClient.iotApi)
+    // --- ESTADOS DE LA PANTALLA (Lo que ve el usuario) ---
 
-    // Estado privado (mutable) y público (inmutable)
-    private val _uiState = MutableStateFlow(IotUiState(isLoading = true))
-    val uiState: StateFlow<IotUiState> = _uiState
+    // Estado de la Barrera (true = Abierta)
+    var isBarrierOpen by mutableStateOf(false)
+        private set
 
-    init {
-        // Al iniciar, comenzamos el ciclo de actualización automática
-        startAutoRefresh()
-    }
+    // Lista de Sensores (Para la pantalla de Gestión)
+    var sensores by mutableStateOf<List<SensorDto>>(emptyList())
+        private set
 
-    private fun startAutoRefresh() {
+    // Historial de Eventos (Para la pantalla Home)
+    var historial by mutableStateOf<List<EventoDto>>(emptyList())
+        private set
+
+    // Usuario Logueado (Si es null, mostramos LoginScreen)
+    var usuarioLogueado by mutableStateOf<UsuarioDto?>(null)
+        private set
+
+    // Mensajes de error o éxito (Para mostrar Toasts o Snackbars)
+    var mensajeUsuario by mutableStateOf<String?>(null)
+        private set
+
+    // --- FUNCIONES QUE LLAMA LA PANTALLA ---
+
+    // 1. LOGIN
+    fun login(email: String, pass: String) {
         viewModelScope.launch {
-            while (true) {
-                loadData()
-                delay(2000) // Recarga datos cada 2 segundos (igual que Guía C)
+            val resultado = repository.login(email, pass)
+            if (resultado.isSuccess) {
+                usuarioLogueado = resultado.getOrNull()
+                // Al entrar, cargamos los datos iniciales
+                cargarDatosIniciales()
+            } else {
+                mensajeUsuario = "Error: Credenciales incorrectas"
             }
         }
     }
 
-    // Función principal para cargar datos de la API
-    private suspend fun loadData() {
-        try {
-            // Pedimos estado de barrera y lista de sensores al mismo tiempo
-            val barrierState = repository.getBarrierState()
-            val sensores = repository.getSensores()
-
-            // Actualizamos la pantalla con datos nuevos y quitamos el loading
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                error = null,
-                isBarrierOpen = barrierState.isOpen,
-                sensorList = sensores
-            )
-        } catch (e: Exception) {
-            // Si falla, mostramos el error pero mantenemos los datos viejos si existen
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                error = e.message ?: "Error de conexión"
-            )
-        }
-    }
-
-    // Acción 1: Usuario presiona botón "Abrir/Cerrar Barrera"
-    fun toggleBarrier(shouldOpen: Boolean) {
+    // 2. CONTROL BARRERA
+    fun toggleBarrier() {
         viewModelScope.launch {
-            try {
-                // Enviamos la orden al backend
-                repository.controlBarrier(shouldOpen)
-                // Actualizamos la UI inmediatamente para que se sienta rápido
-                _uiState.value = _uiState.value.copy(isBarrierOpen = shouldOpen)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = "Error moviendo barrera")
+            // Si está abierta, mandamos cerrar (false), y viceversa
+            val nuevaOrden = !isBarrierOpen
+            val resultado = repository.controlBarrier(nuevaOrden)
+
+            if (resultado.isSuccess) {
+                isBarrierOpen = resultado.getOrDefault(false)
+                refrescarHistorial() // Actualizamos historial para ver el evento
+            } else {
+                mensajeUsuario = "Error de conexión con la Barrera"
             }
         }
     }
 
-    // Acción 2: Usuario (Admin) activa/desactiva un sensor
-    fun toggleSensorState(sensor: SensorDto, isActive: Boolean) {
+    // 3. GESTIÓN DE SENSORES
+    fun cargarSensores() {
         viewModelScope.launch {
-            try {
-                // Definimos el nuevo estado en texto, según pide tu backend
-                val newStateString = if (isActive) "ACTIVO" else "INACTIVO"
+            val res = repository.getSensores()
+            if (res.isSuccess) sensores = res.getOrDefault(emptyList())
+        }
+    }
 
-                // Llamamos a la API
-                repository.updateSensorState(sensor.id, newStateString)
-
-                // Nota: No actualizamos _uiState aquí manualmente porque
-                // el "startAutoRefresh" traerá el dato actualizado en menos de 2 seg.
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = "Error actualizando sensor")
+    fun agregarSensor(codigo: String, tipo: String) {
+        viewModelScope.launch {
+            val res = repository.addSensor(codigo, tipo)
+            if (res.isSuccess) {
+                mensajeUsuario = "Sensor agregado correctamente"
+                cargarSensores() // Recargar lista
+            } else {
+                mensajeUsuario = "Error al agregar sensor"
             }
         }
+    }
+
+    fun cambiarEstadoSensor(sensor: SensorDto) {
+        viewModelScope.launch {
+            val res = repository.toggleSensorState(sensor)
+            if (res.isSuccess) cargarSensores() // Recargar lista para ver el cambio
+        }
+    }
+
+    // 4. HISTORIAL
+    fun refrescarHistorial() {
+        viewModelScope.launch {
+            val res = repository.getHistorial()
+            if (res.isSuccess) {
+                historial = res.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    // Función auxiliar para cargar todo al inicio
+    private fun cargarDatosIniciales() {
+        viewModelScope.launch {
+            // Obtenemos estado actual de la barrera
+            val barreraRes = repository.getBarrierState()
+            if (barreraRes.isSuccess) isBarrierOpen = barreraRes.getOrDefault(false)
+
+            // Cargamos listas
+            cargarSensores()
+            refrescarHistorial()
+        }
+    }
+
+    // Limpiar mensaje después de mostrarlo
+    fun limpiarMensaje() {
+        mensajeUsuario = null
     }
 }
