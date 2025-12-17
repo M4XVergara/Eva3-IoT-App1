@@ -33,4 +33,14 @@ interface IotApi {
     // --- HISTORIAL (Esto faltaba y causaba error "Unresolved reference: getHistorial") ---
     @GET("eventos")
     suspend fun getHistorial(): List<EventoDto>
+
+    // --- GESTIÓN USUARIOS ---
+    @GET("usuarios/{deptoId}")
+    suspend fun getUsuarios(@Path("deptoId") deptoId: Int): List<UsuarioDto>
+
+    @POST("usuarios")
+    suspend fun addUsuario(@Body request: UsuarioRequest): LoginResponseDto // Reusamos LoginResponse o creamos uno simple
+
+    @PUT("usuarios/{id}/estado")
+    suspend fun updateUsuarioEstado(@Path("id") id: Int, @Body request: EstadoUsuarioRequest): LoginResponseDto
 }

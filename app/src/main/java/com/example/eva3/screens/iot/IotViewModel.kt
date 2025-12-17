@@ -121,4 +121,52 @@ class IotViewModel(private val repository: IotRepository) : ViewModel() {
     fun limpiarMensaje() {
         mensajeUsuario = null
     }
+
+    // --- 5. CERRAR SESIÓN ---
+    fun cerrarSesion() {
+        usuarioLogueado = null
+        sensores = emptyList()
+        historial = emptyList()
+        isBarrierOpen = false
+        mensajeUsuario = null // Limpiar mensajes antiguos
+    }
+
+    // Lista de Vecinos
+    var vecinos by mutableStateOf<List<UsuarioDto>>(emptyList())
+        private set
+
+    fun cargarVecinos() {
+        viewModelScope.launch {
+            val deptoId = usuarioLogueado?.departamento_id
+            if (deptoId != null) {
+                val res = repository.getUsuarios(deptoId)
+                if (res.isSuccess) {
+                    // Filtramos para no mostrarse a uno mismo en la lista
+                    vecinos = res.getOrDefault(emptyList()).filter { it.id != usuarioLogueado?.id }
+                }
+            }
+        }
+    }
+
+    fun crearVecino(nombre: String, email: String, pass: String) {
+        viewModelScope.launch {
+            val deptoId = usuarioLogueado?.departamento_id
+            if (deptoId != null) {
+                val res = repository.addUsuario(nombre, email, pass, deptoId)
+                if (res.isSuccess) {
+                    mensajeUsuario = "Vecino agregado exitosamente"
+                    cargarVecinos()
+                } else {
+                    mensajeUsuario = "Error al crear vecino"
+                }
+            }
+        }
+    }
+
+    fun bloquearVecino(vecino: UsuarioDto) {
+        viewModelScope.launch {
+            repository.toggleBloqueoUsuario(vecino)
+            cargarVecinos() // Recargar para ver el cambio de color
+        }
+    }
 }

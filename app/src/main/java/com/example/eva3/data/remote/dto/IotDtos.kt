@@ -13,9 +13,23 @@ data class LoginResponseDto(
 
 data class UsuarioDto(
     val id: Int,
+    val nombre: String?,
+    val email: String?,
+    val rol: String?,
+    val numero_depto: String?,
+    val departamento_id: Int?
+)
+// DTO para crear nuevo usuario
+data class UsuarioRequest(
     val nombre: String,
     val email: String,
-    val rol: String
+    val password: String,
+    val departamento_id: Int
+)
+
+// DTO para cambiar estado
+data class EstadoUsuarioRequest(
+    val nuevoRol: String
 )
 
 // 2. Sensor
