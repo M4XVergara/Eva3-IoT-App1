@@ -3,12 +3,13 @@ package com.example.eva3.data.remote.dto
 // 1. DTOs para Login (Esto es lo que le faltaba a tu código)
 data class LoginRequestDto(
     val email: String,
-    val password: String
+    val pass: String
 )
 
 data class LoginResponseDto(
     val status: String,      // "ok" o "error"
-    val usuario: UsuarioDto? // null si falla
+    val usuario: UsuarioDto?,
+    val message: String? = null// null si falla
 )
 
 data class UsuarioDto(
@@ -37,7 +38,10 @@ data class SensorDto(
     val id: Int = 0,
     val codigo_sensor: String,
     val estado: String,
-    val tipo: String
+    val tipo: String,
+    val departamento_id: Int? = null,
+    val usuario_id: Int? = null,      // <--- NUEVO
+    val nombre_dueno: String? = null
 )
 
 // 3. Barrera
@@ -58,3 +62,6 @@ data class EventoDto(
     val tipo: String,
     val detalle: String
 )
+
+data class ValidacionRequest(val mac: String)
+data class ValidacionResponse(val acceso: Boolean, val mensaje: String?)

@@ -2,10 +2,10 @@ package com.example.eva3.data.remote
 
 import com.example.eva3.data.remote.dto.*
 
-// VERIFICA QUE ESTA LÍNEA 5 TENGA LA PALABRA 'class' AL INICIO
+// LA CLAVE: Aquí debe decir "class IotRepository"
 class IotRepository(private val api: IotApi) {
 
-    // --- 1. AUTENTICACIÓN (LOGIN) ---
+    // --- 1. AUTENTICACIÓN (LOGIN) MEJORADO ---
     suspend fun login(email: String, pass: String): Result<UsuarioDto> {
         return try {
             val request = LoginRequestDto(email, pass)
@@ -14,7 +14,9 @@ class IotRepository(private val api: IotApi) {
             if (response.status == "ok" && response.usuario != null) {
                 Result.success(response.usuario)
             } else {
-                Result.failure(Exception("Credenciales incorrectas"))
+                // CAMBIO: Ahora usamos el mensaje que viene del servidor (o uno por defecto)
+                val errorMsg = response.message ?: "Error de acceso desconocido"
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -31,10 +33,17 @@ class IotRepository(private val api: IotApi) {
         }
     }
 
-    suspend fun addSensor(codigo: String, tipo: String): Result<SensorDto> {
+    // ACTUALIZADO: Recibe deptoId y usuarioId (puede ser null)
+    suspend fun addSensor(codigo: String, tipo: String, deptoId: Int, usuarioId: Int?): Result<SensorDto> {
         return try {
-            // El ID se autogenera en BD (enviamos 0). Estado inicial ACTIVO.
-            val sensor = SensorDto(id = 0, codigo_sensor = codigo, tipo = tipo, estado = "ACTIVO")
+            val sensor = SensorDto(
+                id = 0,
+                codigo_sensor = codigo,
+                tipo = tipo,
+                estado = "ACTIVO",
+                departamento_id = deptoId,
+                usuario_id = usuarioId // <--- Enviamos el dueño al servidor
+            )
             val response = api.addSensor(sensor)
             Result.success(response)
         } catch (e: Exception) {
@@ -42,13 +51,21 @@ class IotRepository(private val api: IotApi) {
         }
     }
 
-    suspend fun toggleSensorState(sensor: SensorDto): Result<SensorDto> {
+    // --- BORRAR SENSOR ---
+    suspend fun deleteSensor(id: Int): Result<Boolean> {
         return try {
-            // Invertimos el estado: Si es ACTIVO pasa a INACTIVO, y viceversa
-            val nuevoEstado = if (sensor.estado == "ACTIVO") "INACTIVO" else "ACTIVO"
-            val sensorActualizado = sensor.copy(estado = nuevoEstado)
+            api.deleteSensor(id)
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
-            val response = api.updateSensorState(sensor.id, sensorActualizado)
+    // --- EDITAR SENSOR (Renombrado para ser general) ---
+    suspend fun updateSensor(sensor: SensorDto): Result<SensorDto> {
+        return try {
+            // Enviamos el objeto completo con los cambios (dueño, codigo, estado)
+            val response = api.updateSensorState(sensor.id, sensor)
             Result.success(response)
         } catch (e: Exception) {
             Result.failure(e)
@@ -58,7 +75,6 @@ class IotRepository(private val api: IotApi) {
     // --- 3. CONTROL DE BARRERA ---
     suspend fun controlBarrier(abrir: Boolean): Result<Boolean> {
         return try {
-            // "accion" debe coincidir con lo que espera tu Node.js ("ABRIR" o "CERRAR")
             val comando = if (abrir) "ABRIR" else "CERRAR"
             val request = BarrierRequest(accion = comando)
 
@@ -72,9 +88,6 @@ class IotRepository(private val api: IotApi) {
     suspend fun getBarrierState(): Result<Boolean> {
         return try {
             val response = api.getBarrierState()
-            // Tu API devuelve un String "ABRIR" o "CERRADA", no un booleano directo en 'estado'.
-            // Pero en el DTO definimos 'isOpen' como booleano para la UI.
-            // Ajuste: La App espera true/false.
             Result.success(response.isOpen)
         } catch (e: Exception) {
             Result.failure(e)
@@ -91,7 +104,7 @@ class IotRepository(private val api: IotApi) {
         }
     }
 
-    // --- 5. GESTIÓN USUARIOS ---
+    // --- 5. GESTIÓN USUARIOS (VECINOS) ---
     suspend fun getUsuarios(deptoId: Int): Result<List<UsuarioDto>> {
         return try {
             val res = api.getUsuarios(deptoId)
@@ -109,10 +122,19 @@ class IotRepository(private val api: IotApi) {
 
     suspend fun toggleBloqueoUsuario(usuario: UsuarioDto): Result<Boolean> {
         return try {
-            // Si es OPERADOR pasa a BLOQUEADO, y viceversa
             val nuevoRol = if (usuario.rol == "BLOQUEADO") "OPERADOR" else "BLOQUEADO"
             api.updateUsuarioEstado(usuario.id, EstadoUsuarioRequest(nuevoRol))
             Result.success(true)
         } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun usarLlaveroDigital(codigo: String): Result<Boolean> {
+        return try {
+            val response = api.validarRfid(ValidacionRequest(codigo))
+            // Si acceso es true, funcionó
+            Result.success(response.acceso)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }
